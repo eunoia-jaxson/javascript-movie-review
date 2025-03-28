@@ -363,6 +363,13 @@ async function withLoading(store, asyncFunc) {
     store.setState({ loading: false });
   }
 }
+const debounce = (fn, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => fn(...args), delay);
+  };
+};
 const modalContentTemplate = async (id, store) => {
   const movie = await fetchMovieDetail(
     id,
@@ -724,37 +731,41 @@ class App {
     this.store.setState({ movies, loading: false });
   }
   attachScrollEvent(store) {
-    window.addEventListener("scroll", async () => {
-      if (isScrolledToBottom()) {
-        const state = store.getState();
-        const currentPage = getCurrentPage(
-          state.movies.length,
-          MOVIE_COUNT.UNIT
-        );
-        if (!state.query && state.movies.length < MOVIE_COUNT.MAX_PAGE * MOVIE_COUNT.UNIT) {
-          const newMovies = await withLoading(
-            store,
-            () => fetchPopularMovies(
-              (error) => alert(error.message),
-              currentPage
-            )
+    window.addEventListener(
+      "scroll",
+      debounce(async () => {
+        if (isScrolledToBottom()) {
+          console.log("scroll");
+          const state = store.getState();
+          const currentPage = getCurrentPage(
+            state.movies.length,
+            MOVIE_COUNT.UNIT
           );
-          store.setState({ movies: [...state.movies, ...newMovies] });
-        } else if (state.query && state.movies.length < state.searchedMoviesLength) {
-          const newMoviesData = await withLoading(
-            store,
-            () => fetchSearchedMovies(
-              state.query,
-              (error) => alert(error.message),
-              currentPage
-            )
-          );
-          store.setState({
-            movies: [...state.movies, ...newMoviesData.results]
-          });
+          if (!state.query && state.movies.length < MOVIE_COUNT.MAX_PAGE * MOVIE_COUNT.UNIT) {
+            const newMovies = await withLoading(
+              store,
+              () => fetchPopularMovies(
+                (error) => alert(error.message),
+                currentPage
+              )
+            );
+            store.setState({ movies: [...state.movies, ...newMovies] });
+          } else if (state.query && state.movies.length < state.searchedMoviesLength) {
+            const newMoviesData = await withLoading(
+              store,
+              () => fetchSearchedMovies(
+                state.query,
+                (error) => alert(error.message),
+                currentPage
+              )
+            );
+            store.setState({
+              movies: [...state.movies, ...newMoviesData.results]
+            });
+          }
         }
-      }
-    });
+      }, 200)
+    );
   }
 }
 const $app = document.querySelector("#wrap");

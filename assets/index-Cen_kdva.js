@@ -1,15 +1,6 @@
 var __defProp = Object.defineProperty;
-var __typeError = (msg) => {
-  throw TypeError(msg);
-};
 var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
-var __accessCheck = (obj, member, msg) => member.has(obj) || __typeError("Cannot " + msg);
-var __privateGet = (obj, member, getter) => (__accessCheck(obj, member, "read from private field"), getter ? getter.call(obj) : member.get(obj));
-var __privateAdd = (obj, member, value) => member.has(obj) ? __typeError("Cannot add the same private member more than once") : member instanceof WeakSet ? member.add(obj) : member.set(obj, value);
-var __privateSet = (obj, member, value, setter) => (__accessCheck(obj, member, "write to private field"), setter ? setter.call(obj, value) : member.set(obj, value), value);
-var __privateMethod = (obj, member, method) => (__accessCheck(obj, member, "access private method"), method);
-var _$target, _store, _App_instances, loadPopularMovies_fn;
 (function polyfill() {
   const relList = document.createElement("link").relList;
   if (relList && relList.supports && relList.supports("modulepreload")) {
@@ -162,7 +153,7 @@ const SearchBar = (store) => {
 };
 function attachSearchEvent(store) {
   const $searchForm = document.querySelector(
-    "#search-form"
+    `#${SEARCH_FORM}`
   );
   if ($searchForm) {
     $searchForm.addEventListener("submit", async (event) => {
@@ -245,7 +236,7 @@ const bannerTemplate = ({ vote_average, title }) => {
             <span class="rate-value">${vote_average}</span>
           </div>
           <div class="title">${title}</div>
-          <button class="primary detail" data-testid="banner-detail-button">자세히 보기</button>
+          <button id="detail-button" class="primary detail" data-testid="banner-detail-button">자세히 보기</button>
         </div>
       </div>
     </div>
@@ -264,38 +255,26 @@ const SkeletonBanner = () => {
   `
   );
 };
+const ALLOWED_RATINGS = [2, 4, 6, 8, 10];
 const Rating = (initialScore = 0) => {
-  const score = initialScore;
+  const score = ALLOWED_RATINGS.includes(initialScore) ? initialScore : 0;
   const scoreMessage = SCORE_MESSAGES[score] || "별점이 없어요";
+  const labelsHTML = ALLOWED_RATINGS.map(
+    (val) => (
+      /* html */
+      `
+    <label for="star${val}" class="rating__label ${val === 0 ? "" : "rating__label--full"}" data-testid="star${val}">
+      <input type="radio" id="star${val}" class="rating__input" name="rating" value="${val}">
+      <span class="star-icon"></span>
+    </label>`
+    )
+  ).join("");
   return (
     /* html */
     `
     <div class="rating" data-testid="rating">
       <div class="rating-bar">
-        <label for="star0">
-          <input type="radio" id="star0" class="rating__input" name="rating" value="0">
-          <span class="star-icon"></span>
-        </label>
-        <label for="star2" class="rating__label rating__label--full" data-testid="star2">
-          <input type="radio" id="star2" class="rating__input" name="rating" value="2">
-          <span class="star-icon"></span>
-        </label>
-        <label for="star4" class="rating__label rating__label--full" data-testid="star4">
-          <input type="radio" id="star4" class="rating__input" name="rating" value="4">
-          <span class="star-icon"></span>
-        </label>
-        <label for="star6" class="rating__label rating__label--full" data-testid="star6">
-          <input type="radio" id="star6" class="rating__input" name="rating" value="6">
-          <span class="star-icon"></span>
-        </label>
-        <label for="star8" class="rating__label rating__label--full" data-testid="star8">
-          <input type="radio" id="star8" class="rating__input" name="rating" value="8">
-          <span class="star-icon"></span>
-        </label>
-        <label for="star10" class="rating__label rating__label--full" data-testid="star10">
-          <input type="radio" id="star10" class="rating__input" name="rating" value="10">
-          <span class="star-icon"></span>
-        </label>
+        ${labelsHTML}
       </div>
       <div class="rating-information">
         <p class="subtitle" data-testid="score-message">${scoreMessage}</p>
@@ -310,45 +289,41 @@ const attachRatingEvents = (movieId, store) => {
   const $rateWrap = document.querySelector(".rating");
   if (!$rateWrap) return;
   const scores = store.getState().starRatings || [];
-  let currentScore = ((_a = scores.find((rating) => rating.id === movieId)) == null ? void 0 : _a.score) || 0;
-  const radio = $rateWrap.querySelector(
+  const currentScore = ((_a = scores.find((rating) => rating.id === movieId)) == null ? void 0 : _a.score) || 0;
+  const $radio = $rateWrap.querySelector(
     `#star${currentScore}`
   );
-  if (radio) {
-    radio.checked = true;
-  }
+  if ($radio) $radio.checked = true;
   const stars = $rateWrap.querySelectorAll(".star-icon");
-  function initStars() {
-    stars.forEach((star) => star.classList.remove("filled"));
-  }
-  function checkedRate() {
-    if (!$rateWrap) return;
-    const checkedRadio = $rateWrap.querySelector(
+  const initStars = () => {
+    stars.forEach(($star) => $star.classList.remove("filled"));
+  };
+  const checkedRate = () => {
+    const $checkedRadio = $rateWrap.querySelector(
       '.rating input[type="radio"]:checked'
     );
     initStars();
-    if (checkedRadio) {
+    if ($checkedRadio) {
       const starLabels = Array.from($rateWrap.querySelectorAll("label"));
       const index = starLabels.findIndex(
-        (label) => label.contains(checkedRadio)
+        ($label) => $label.contains($checkedRadio)
       );
       for (let i = 0; i <= index; i++) {
-        const icon = starLabels[i].querySelector(".star-icon");
-        if (icon) {
-          icon.classList.add("filled");
-        }
+        const $icon = starLabels[i].querySelector(".star-icon");
+        if ($icon) $icon.classList.add("filled");
       }
     }
-  }
-  function saveRate() {
-    if (!$rateWrap) return;
-    const checkedRadio = $rateWrap.querySelector(
+  };
+  const saveRate = () => {
+    const $checkedRadio = $rateWrap.querySelector(
       '.rating input[type="radio"]:checked'
     );
-    if (checkedRadio) {
-      const newScore = Number(checkedRadio.value);
+    if ($checkedRadio) {
+      const newScore = Number($checkedRadio.value);
       let starRatings = store.getState().starRatings || [];
-      const index = starRatings.findIndex((r) => r.id === movieId);
+      const index = starRatings.findIndex(
+        (rating) => rating.id === movieId
+      );
       if (index !== -1) {
         starRatings[index].score = newScore;
       } else {
@@ -357,10 +332,10 @@ const attachRatingEvents = (movieId, store) => {
       localStorage.setItem("starRatings", JSON.stringify(starRatings));
       store.setState({ starRatings });
     }
-  }
+  };
   checkedRate();
-  stars.forEach((starIcon) => {
-    starIcon.addEventListener("click", () => {
+  stars.forEach(($starIcon) => {
+    $starIcon.addEventListener("click", () => {
       setTimeout(() => {
         checkedRate();
         saveRate();
@@ -368,15 +343,33 @@ const attachRatingEvents = (movieId, store) => {
     });
   });
 };
+const isScrolledToBottom = (threshold = 180) => {
+  return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - threshold;
+};
+const getCurrentPage = (moviesLength, unit) => {
+  return Math.floor(moviesLength / unit) + 1;
+};
+const getCurrentScore = (id, store) => {
+  var _a;
+  const scores = store.getState().starRatings || [];
+  return ((_a = scores.find((rating) => rating.id === id)) == null ? void 0 : _a.score) || 0;
+};
+async function withLoading(store, asyncFunc) {
+  store.setState({ loading: true });
+  try {
+    const result = await asyncFunc();
+    return result;
+  } finally {
+    store.setState({ loading: false });
+  }
+}
 const modalContentTemplate = async (id, store) => {
   const movie = await fetchMovieDetail(
     id,
     (error) => alert(error.message)
   );
   const ratingHTML = Rating(getCurrentScore(id, store));
-  const contentHTML = (
-    /* html */
-    `
+  const contentHTML = `
     <div class="modal-image">
       <div class="skeleton-detail-thumbnail"></div>
       <img src="${movie.poster_path ? "https://image.tmdb.org/t/p/original" + movie.poster_path : "./images/logo.png"}" alt="${movie.title}" class="detail-thumbnail" />
@@ -385,9 +378,9 @@ const modalContentTemplate = async (id, store) => {
       <div class="description-information">
         <h2>${movie.title}</h2>
         <p class="category">${movie.release_date.slice(
-      0,
-      4
-    )} · ${movie.genres.join(", ")}</p>
+    0,
+    4
+  )} · ${movie.genres.join(", ")}</p>
         <p class="rate">
           <span class="label">평균</span>
           <img src="./images/star_filled.png" class="star" /><span>${movie.vote_average}</span>
@@ -398,36 +391,45 @@ const modalContentTemplate = async (id, store) => {
       <div id="modal-rating">${ratingHTML}</div>
       <hr />
       <p class="subtitle">줄거리</p>
-      <p class="detail">${movie.overview || "줄거리 정보가 없습니다"}</p>
+      <p class="detail">${movie.overview || "줄거리 정보가 없습니다."}</p>
     </div>
-  `
-  );
+  `;
   setTimeout(() => {
     attachRatingEvents(id, store);
   }, 0);
   return contentHTML;
 };
-const getCurrentScore = (id, store) => {
-  var _a;
-  const scores = store.getState().starRatings || [];
-  return ((_a = scores.find((rating) => rating.id === id)) == null ? void 0 : _a.score) || 0;
+const renderTemplate = (container, html) => {
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  container.replaceChildren(template.content.cloneNode(true));
+};
+const appendHTMLs = (container, html) => {
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  container.append(...Array.from(template.content.childNodes));
+};
+const appendHTML = (container, html) => {
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  container.appendChild(template.content.firstChild);
 };
 class Modal {
   constructor(store, contentGenerator) {
     __publicField(this, "store");
     __publicField(this, "contentGenerator");
-    __publicField(this, "modalBackground");
-    __publicField(this, "closeButton");
-    __publicField(this, "modalContainer");
+    __publicField(this, "$modalBackground");
+    __publicField(this, "$closeButton");
+    __publicField(this, "$modalContainer");
     __publicField(this, "currentMovieId", null);
     this.store = store;
     this.contentGenerator = contentGenerator;
-    this.modalBackground = document.querySelector(
+    this.$modalBackground = document.querySelector(
       "#modal-background"
     );
-    this.closeButton = document.querySelector("#close-modal");
-    this.modalContainer = this.modalBackground.querySelector(
-      ".modal-container"
+    this.$closeButton = document.querySelector("#close-modal");
+    this.$modalContainer = this.$modalBackground.querySelector(
+      "#modal-container"
     );
     this.bindEvents();
     this.store.subscribe(() => {
@@ -437,112 +439,96 @@ class Modal {
     });
   }
   bindEvents() {
-    this.closeButton.addEventListener("click", this.close.bind(this));
+    this.$closeButton.addEventListener("click", this.close.bind(this));
     window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        this.close();
-      }
+      if (e.key === "Escape") this.close();
     });
-    this.modalBackground.addEventListener("click", (e) => {
-      if (e.target === this.modalBackground) {
-        this.close();
-      }
+    this.$modalBackground.addEventListener("click", (e) => {
+      if (e.target === this.$modalBackground) this.close();
     });
   }
   open(movieId) {
     this.currentMovieId = movieId;
     this.contentGenerator(movieId, this.store).then((contentHTML) => {
-      this.modalContainer.innerHTML = contentHTML;
-      this.modalBackground.classList.add("active");
-      this.attachThumbnailLoadEvent(this.modalContainer);
+      renderTemplate(this.$modalContainer, contentHTML);
+      this.$modalBackground.classList.add("active");
+      this.attachThumbnailLoadEvent(this.$modalContainer);
     });
   }
   updateRating() {
-    if (this.currentMovieId !== null) {
-      this.contentGenerator(this.currentMovieId, this.store).then(
-        (contentHTML) => {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(contentHTML, "text/html");
-          const newRating = doc.querySelector("#modal-rating");
-          const currentRating = this.modalContainer.querySelector("#modal-rating");
-          if (newRating && currentRating) {
-            currentRating.innerHTML = newRating.innerHTML;
-          }
-        }
+    var _a;
+    if (this.currentMovieId) {
+      const $ratingContainer = this.$modalContainer.querySelector(
+        "#modal-rating"
       );
+      if ($ratingContainer) {
+        const scores = this.store.getState().starRatings || [];
+        const currentScore = ((_a = scores.find((rating) => rating.id === this.currentMovieId)) == null ? void 0 : _a.score) || 0;
+        renderTemplate($ratingContainer, Rating(currentScore));
+        attachRatingEvents(this.currentMovieId, this.store);
+      }
     }
   }
   isOpen() {
-    return this.modalBackground.classList.contains("active");
+    return this.$modalBackground.classList.contains("active");
   }
   close() {
-    this.modalBackground.classList.remove("active");
+    this.$modalBackground.classList.remove("active");
     this.currentMovieId = null;
   }
-  attachThumbnailLoadEvent(container = document) {
-    const thumbnail = container.querySelector(
+  attachThumbnailLoadEvent($container) {
+    const $thumbnail = $container.querySelector(
       "img.detail-thumbnail"
     );
-    if (!thumbnail) return;
-    if (!thumbnail.getAttribute("data-load-listener-attached")) {
-      thumbnail.addEventListener("load", function() {
+    if (!$thumbnail) return;
+    if (!$thumbnail.getAttribute("data-load-listener-attached")) {
+      $thumbnail.addEventListener("load", function() {
         this.style.display = "block";
-        if (this.previousElementSibling && this.previousElementSibling.classList.contains(
-          "skeleton-detail-thumbnail"
-        )) {
-          this.previousElementSibling.style.display = "none";
+        const $prev = this.previousElementSibling;
+        if ($prev && $prev.classList.contains("skeleton-detail-thumbnail")) {
+          $prev.style.display = "none";
         }
       });
-      thumbnail.setAttribute("data-load-listener-attached", "true");
+      $thumbnail.setAttribute("data-load-listener-attached", "true");
     }
   }
 }
+const API_BANNER_URL = "https://image.tmdb.org/t/p/original";
 class Banner {
   constructor($container, store) {
     __publicField(this, "$container");
     __publicField(this, "store");
-    __publicField(this, "modal");
-    __publicField(this, "detailHandler");
+    __publicField(this, "$modal");
     this.$container = $container;
     this.store = store;
-    this.modal = new Modal(this.store, modalContentTemplate);
-    this.detailHandler = this.handleDetailButtonClick.bind(this);
+    this.$modal = new Modal(this.store, modalContentTemplate);
     this.store.subscribe(this.render.bind(this));
     this.render(this.store.getState());
   }
   render(state) {
-    var _a;
-    if (!state.query) {
-      if (state.movies.length) {
-        const movie = state.movies[0];
-        this.$container.innerHTML = bannerTemplate(movie);
-        const $banner = this.$container.querySelector("#banner");
-        if ($banner && movie.backdrop_path) {
-          $banner.style.backgroundImage = `url(${"https://image.tmdb.org/t/p/original"}${movie.backdrop_path})`;
-        }
-        const $detailButton = this.$container.querySelector(
-          ".detail"
-        );
-        if ($detailButton) {
-          const newDetailButton = $detailButton.cloneNode(true);
-          newDetailButton.addEventListener(
-            "click",
-            this.detailHandler.bind(this, movie.id.toString())
-          );
-          (_a = $detailButton.parentElement) == null ? void 0 : _a.replaceChild(
-            newDetailButton,
-            $detailButton
-          );
-        }
-      } else {
-        this.$container.innerHTML = SkeletonBanner();
-      }
-    } else {
-      this.$container.innerHTML = "";
+    if (state.query) {
+      renderTemplate(this.$container, "");
+      return;
     }
-  }
-  handleDetailButtonClick(movieId) {
-    this.modal.open(movieId);
+    if (state.movies.length) {
+      const movie = state.movies[0];
+      renderTemplate(this.$container, bannerTemplate(movie));
+      const $banner = this.$container.querySelector("#banner");
+      if ($banner && movie.backdrop_path) {
+        $banner.style.backgroundImage = `url(${API_BANNER_URL}${movie.backdrop_path})`;
+      }
+      const $detailButton = this.$container.querySelector(
+        "#detail-button"
+      );
+      if ($detailButton) {
+        $detailButton.addEventListener(
+          "click",
+          () => this.$modal.open(movie.id.toString())
+        );
+      }
+      return;
+    }
+    renderTemplate(this.$container, SkeletonBanner());
   }
 }
 const ListTitle = (query) => {
@@ -590,122 +576,92 @@ const SkeletonMovieItem = () => {
   `
   );
 };
-const fullMovieListTemplate = ({
-  movies,
-  query,
-  loading
-}) => {
-  return (
-    /* html */
-    `
-    <main>
-      <section>
-        ${ListTitle(query)}
-        <ul id="movie-list" class="thumbnail-list" data-testid="movie-list">
-          ${movieItemsTemplate({ movies, query })}
-        </ul>
-      </section>
-    </main>
+const fullMovieListTemplate = (movies, query) => (
+  /* html */
   `
-  );
-};
-const movieItemsTemplate = ({
-  movies,
-  query
-}) => {
-  let movieContent = "";
-  if (movies.length === 0 && !query) {
-    movieContent = new Array(MOVIE_COUNT.UNIT).fill(0).map(() => SkeletonMovieItem()).join("");
-  } else if (movies.length === 0 && query) {
-    movieContent = `<div></div>
-                    <div></div>
-                    <div class="center">
-                      <img src="./images/not_found.png"/>
-                      <h2 data-testid="no-result-message">${ERROR_MESSAGES.NO_RESULT}</h2>
-                    </div>`;
-  } else {
-    movieContent = movies.map((movie) => MovieItem(movie)).join("");
+  <main>
+    <section>
+      ${ListTitle(query)}
+      <ul id="movie-list" class="thumbnail-list" data-testid="movie-list">
+        ${movieItemsTemplate(movies, query)}
+      </ul>
+    </section>
+  </main>
+`
+);
+const movieItemsTemplate = (movies, query) => {
+  if (movies.length === 0) {
+    if (query) {
+      return (
+        /* html */
+        `
+        <div></div>
+        <div></div>
+        <div class="center">
+          <img src="./images/not_found.png"/>
+          <h2 data-testid="no-result-message">${ERROR_MESSAGES.NO_RESULT}</h2>
+        </div>
+      `
+      );
+    }
+    return new Array(MOVIE_COUNT.UNIT).fill(0).map(() => SkeletonMovieItem()).join("");
   }
-  return movieContent;
+  return movies.map(MovieItem).join("");
 };
 class MovieList {
   constructor($container, store) {
     __publicField(this, "$container");
     __publicField(this, "store");
-    __publicField(this, "previousMoviesLength", 0);
-    __publicField(this, "previousQuery", "");
+    __publicField(this, "prevMoviesLength", 0);
+    __publicField(this, "prevQuery", "");
     this.$container = $container;
     this.store = store;
     this.store.subscribe(this.render.bind(this));
     this.render(this.store.getState());
   }
   render(state) {
-    if (!this.previousMoviesLength || state.query !== this.previousQuery) {
-      this.$container.innerHTML = fullMovieListTemplate({
-        movies: state.movies,
-        query: state.query,
-        searchedMoviesLength: state.searchedMoviesLength,
-        loading: state.loading
-      });
-      this.previousMoviesLength = state.movies.length;
-      this.previousQuery = state.query;
-    } else {
-      if (state.movies.length > this.previousMoviesLength) {
-        const ul = this.$container.querySelector(
-          "ul#movie-list"
-        );
-        const newMovies = state.movies.slice(this.previousMoviesLength);
-        const newItemsHTML = movieItemsTemplate({
-          movies: newMovies,
-          loading: state.loading,
-          query: state.query
-        });
-        ul.insertAdjacentHTML("beforeend", newItemsHTML);
-        this.previousMoviesLength = state.movies.length;
-      }
+    const $ul = this.$container.querySelector("ul#movie-list");
+    if (!this.prevMoviesLength || state.query !== this.prevQuery) {
+      renderTemplate(
+        this.$container,
+        fullMovieListTemplate(state.movies, state.query)
+      );
+      this.prevMoviesLength = state.movies.length;
+      this.prevQuery = state.query;
+    } else if (state.movies.length > this.prevMoviesLength) {
+      const newMovies = state.movies.slice(this.prevMoviesLength);
+      appendHTMLs($ul, movieItemsTemplate(newMovies, state.query));
+      this.prevMoviesLength = state.movies.length;
     }
-    this.removeSkeleton(state.loading);
+    if (!state.loading && $ul) {
+      $ul.querySelectorAll(".skeleton-item").forEach(($li) => $li.remove());
+    }
     this.attachThumbnailLoadEvent(this.$container);
-    this.attachMovieItemEvents(this.store, this.$container);
+    this.attachMovieItemEvents(state);
   }
-  removeSkeleton(loading) {
-    if (!loading) {
-      const $ul = document.querySelector("#movie-list");
-      if ($ul) {
-        const $skeletons = $ul.querySelectorAll(".skeleton-item");
-        $skeletons.forEach((s) => s.remove());
-      }
-    }
-  }
-  attachThumbnailLoadEvent(container = document) {
-    const thumbnails = container.querySelectorAll("img.thumbnail");
-    thumbnails.forEach((img) => {
-      if (!img.getAttribute("data-load-listener-attached")) {
-        img.addEventListener("load", function() {
+  attachThumbnailLoadEvent($container) {
+    $container.querySelectorAll("img.thumbnail").forEach(($img) => {
+      if (!$img.getAttribute("data-load-listener-attached")) {
+        $img.addEventListener("load", function() {
           this.style.display = "block";
-          if (this.previousElementSibling && this.previousElementSibling.classList.contains("skeleton-thumbnail")) {
-            this.previousElementSibling.style.display = "none";
+          const $prev = this.previousElementSibling;
+          if ($prev && $prev.classList.contains("skeleton-thumbnail")) {
+            $prev.style.display = "none";
           }
         });
-        img.setAttribute("data-load-listener-attached", "true");
+        $img.setAttribute("data-load-listener-attached", "true");
       }
     });
   }
-  attachMovieItemEvents(store, container) {
-    const modal = new Modal(store, modalContentTemplate);
-    const items = container.querySelectorAll("li[data-movie-id]");
-    items.forEach((li) => {
-      li.addEventListener("click", async () => {
-        const movieIdStr = li.getAttribute("data-movie-id");
-        if (movieIdStr) {
-          const state = store.getState();
-          const movie = state.movies.find(
-            (m) => m.id.toString() === movieIdStr
-          );
-          if (movie) {
-            modal.open(movie.id);
-          }
-        }
+  attachMovieItemEvents(state) {
+    const $modal = new Modal(this.store, modalContentTemplate);
+    this.$container.querySelectorAll("li[data-movie-id]").forEach(($li) => {
+      $li.addEventListener("click", () => {
+        const movieIdString = $li.getAttribute("data-movie-id");
+        const movie = state.movies.find(
+          (movie2) => movie2.id.toString() === movieIdString
+        );
+        if (movie) $modal.open(movie.id);
       });
     });
   }
@@ -731,74 +687,75 @@ class Store {
 }
 class App {
   constructor($target) {
-    __privateAdd(this, _App_instances);
-    __privateAdd(this, _$target);
-    __privateAdd(this, _store);
-    __publicField(this, "bannerContainer");
-    __publicField(this, "mainContainer");
-    __publicField(this, "bannerComponent");
-    __publicField(this, "movieListComponent");
-    __privateSet(this, _$target, $target);
-    __privateSet(this, _store, new Store({
+    __publicField(this, "$target");
+    __publicField(this, "store");
+    __publicField(this, "$bannerContainer");
+    __publicField(this, "$mainContainer");
+    __publicField(this, "$bannerComponent");
+    __publicField(this, "$movieListComponent");
+    this.$target = $target;
+    this.store = new Store({
       movies: [],
       query: "",
       searchedMoviesLength: 0,
       loading: false,
       starRatings: localStorage.getItem("starRatings") ? JSON.parse(localStorage.getItem("starRatings")) : []
-    }));
-    const $headerTemplate = document.createElement("template");
-    $headerTemplate.innerHTML = Header(__privateGet(this, _store));
-    __privateGet(this, _$target).appendChild($headerTemplate.content);
-    this.bannerContainer = document.createElement("section");
-    this.bannerContainer.id = "banner-container";
-    __privateGet(this, _$target).appendChild(this.bannerContainer);
-    this.mainContainer = document.createElement("div");
-    this.mainContainer.classList.add("container");
-    __privateGet(this, _$target).appendChild(this.mainContainer);
-    const $footerTemplate = document.createElement("template");
-    $footerTemplate.innerHTML = Footer();
-    __privateGet(this, _$target).appendChild($footerTemplate.content);
-    this.bannerComponent = new Banner(this.bannerContainer, __privateGet(this, _store));
-    this.movieListComponent = new MovieList(this.mainContainer, __privateGet(this, _store));
-    if (__privateGet(this, _store).getState().movies.length === 0) {
-      __privateMethod(this, _App_instances, loadPopularMovies_fn).call(this);
+    });
+    appendHTML(this.$target, Header(this.store));
+    this.$bannerContainer = document.createElement("section");
+    this.$bannerContainer.id = "banner-container";
+    this.$target.appendChild(this.$bannerContainer);
+    this.$mainContainer = document.createElement("section");
+    this.$mainContainer.classList.add("container");
+    this.$target.appendChild(this.$mainContainer);
+    appendHTML(this.$target, Footer());
+    this.$bannerComponent = new Banner(this.$bannerContainer, this.store);
+    this.$movieListComponent = new MovieList(this.$mainContainer, this.store);
+    if (this.store.getState().movies.length === 0) {
+      this.loadPopularMovies();
     }
+    this.attachScrollEvent(this.store);
+  }
+  async loadPopularMovies() {
+    this.store.setState({ loading: true });
+    const movies = await fetchPopularMovies(
+      (error) => alert(error.message)
+    );
+    this.store.setState({ movies, loading: false });
+  }
+  attachScrollEvent(store) {
     window.addEventListener("scroll", async () => {
-      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 180) {
-        const state = __privateGet(this, _store).getState();
-        const currentPage = Math.floor(state.movies.length / MOVIE_COUNT.UNIT) + 1;
-        __privateGet(this, _store).setState({ loading: true });
-        if (!state.query && state.movies.length < MOVIE_COUNT.MAX_PAGE * MOVIE_COUNT.UNIT) {
-          const newMovies = await fetchPopularMovies(
-            (error) => alert(error.message),
-            currentPage
-          );
-          __privateGet(this, _store).setState({ movies: [...state.movies, ...newMovies] });
-          return;
-        }
-        if (state.movies.length >= state.searchedMoviesLength) return;
-        const newMoviesData = await fetchSearchedMovies(
-          state.query,
-          (error) => alert(error.message),
-          currentPage
+      if (isScrolledToBottom()) {
+        const state = store.getState();
+        const currentPage = getCurrentPage(
+          state.movies.length,
+          MOVIE_COUNT.UNIT
         );
-        __privateGet(this, _store).setState({
-          movies: [...state.movies, ...newMoviesData.results],
-          loading: false
-        });
+        if (!state.query && state.movies.length < MOVIE_COUNT.MAX_PAGE * MOVIE_COUNT.UNIT) {
+          const newMovies = await withLoading(
+            store,
+            () => fetchPopularMovies(
+              (error) => alert(error.message),
+              currentPage
+            )
+          );
+          store.setState({ movies: [...state.movies, ...newMovies] });
+        } else if (state.query && state.movies.length < state.searchedMoviesLength) {
+          const newMoviesData = await withLoading(
+            store,
+            () => fetchSearchedMovies(
+              state.query,
+              (error) => alert(error.message),
+              currentPage
+            )
+          );
+          store.setState({
+            movies: [...state.movies, ...newMoviesData.results]
+          });
+        }
       }
     });
   }
 }
-_$target = new WeakMap();
-_store = new WeakMap();
-_App_instances = new WeakSet();
-loadPopularMovies_fn = async function() {
-  __privateGet(this, _store).setState({ loading: true });
-  const movies = await fetchPopularMovies(
-    (error) => alert(error.message)
-  );
-  __privateGet(this, _store).setState({ movies, loading: false });
-};
 const $app = document.querySelector("#wrap");
 new App($app);

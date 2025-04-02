@@ -591,6 +591,22 @@ const attachRatingEvents = (movieId, store) => {
     });
   });
 };
+const ProgressIndicator = (scale = 1) => {
+  return (
+    /*html*/
+    `
+    <div class="spinner-container">
+      <div class="orbit-spinner" style="scale: ${scale}">
+        <div class="planet"></div>
+        <div class="orbit">
+          <div class="satellite satellite-1"></div>
+          <div class="satellite satellite-2"></div>
+        </div>
+      </div>
+    </div>
+  `
+  );
+};
 class Modal {
   constructor(store, contentGenerator) {
     __publicField(this, "store");
@@ -622,9 +638,10 @@ class Modal {
   }
   open(movieId) {
     this.currentMovieId = movieId;
+    renderTemplate(this.$modalContainer, ProgressIndicator());
+    this.$modalBackground.classList.add("active");
     this.contentGenerator(movieId, this.store).then((contentHTML) => {
       renderTemplate(this.$modalContainer, contentHTML);
-      this.$modalBackground.classList.add("active");
       this.attachThumbnailLoadEvent(this.$modalContainer);
     });
   }

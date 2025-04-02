@@ -47,6 +47,7 @@ const ERROR_MESSAGES = {
   MOVIE_FETCH_FAILED: "영화 정보를 불러오는 데 실패했습니다. 새로고침 해 주세요."
 };
 const SCORE_MESSAGES = {
+  0: "별점이 없어요",
   2: "최악이예요",
   4: "별로예요",
   6: "보통이에요",
@@ -72,7 +73,7 @@ class APIClient {
       const response = await fetch(url, options);
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message || ERROR_MESSAGES.MOVIE_FETCH_FAILED);
+        throw new Error(ERROR_MESSAGES.MOVIE_FETCH_FAILED);
       }
       return data;
     } catch (error) {
@@ -108,7 +109,14 @@ const fetchSearchedMovies = async (query, onError, page = 1) => {
       page: page.toString()
     });
     const response = await APIClient.get(`/search/movie?${params.toString()}`);
-    return { ...response, results: response.results };
+    return {
+      ...response,
+      results: response.results.map((movie) => ({
+        ...movie,
+        id: movie.id.toString(),
+        vote_average: movie.vote_average.toFixed(1)
+      }))
+    };
   } catch (error) {
     if (error instanceof Error && onError) {
       onError(error);
@@ -255,157 +263,6 @@ const SkeletonBanner = () => {
   `
   );
 };
-const ALLOWED_RATINGS = [2, 4, 6, 8, 10];
-const Rating = (initialScore = 0) => {
-  const score = ALLOWED_RATINGS.includes(initialScore) ? initialScore : 0;
-  const scoreMessage = SCORE_MESSAGES[score] || "별점이 없어요";
-  const labelsHTML = ALLOWED_RATINGS.map(
-    (val) => (
-      /* html */
-      `
-    <label for="star${val}" class="rating__label ${val === 0 ? "" : "rating__label--full"}" data-testid="star${val}">
-      <input type="radio" id="star${val}" class="rating__input" name="rating" value="${val}">
-      <span class="star-icon"></span>
-    </label>`
-    )
-  ).join("");
-  return (
-    /* html */
-    `
-    <div class="rating" data-testid="rating">
-      <div class="rating-bar">
-        ${labelsHTML}
-      </div>
-      <div class="rating-information">
-        <p class="subtitle" data-testid="score-message">${scoreMessage}</p>
-        <p class="subtitle color-95a1b2">(${score}/10)</p>
-      </div>
-    </div>
-  `
-  );
-};
-const attachRatingEvents = (movieId, store) => {
-  var _a;
-  const $rateWrap = document.querySelector(".rating");
-  if (!$rateWrap) return;
-  const scores = store.getState().starRatings || [];
-  const currentScore = ((_a = scores.find((rating) => rating.id === movieId)) == null ? void 0 : _a.score) || 0;
-  const $radio = $rateWrap.querySelector(
-    `#star${currentScore}`
-  );
-  if ($radio) $radio.checked = true;
-  const stars = $rateWrap.querySelectorAll(".star-icon");
-  const initStars = () => {
-    stars.forEach(($star) => $star.classList.remove("filled"));
-  };
-  const checkedRate = () => {
-    const $checkedRadio = $rateWrap.querySelector(
-      '.rating input[type="radio"]:checked'
-    );
-    initStars();
-    if ($checkedRadio) {
-      const starLabels = Array.from($rateWrap.querySelectorAll("label"));
-      const index = starLabels.findIndex(
-        ($label) => $label.contains($checkedRadio)
-      );
-      for (let i = 0; i <= index; i++) {
-        const $icon = starLabels[i].querySelector(".star-icon");
-        if ($icon) $icon.classList.add("filled");
-      }
-    }
-  };
-  const saveRate = () => {
-    const $checkedRadio = $rateWrap.querySelector(
-      '.rating input[type="radio"]:checked'
-    );
-    if ($checkedRadio) {
-      const newScore = Number($checkedRadio.value);
-      let starRatings = store.getState().starRatings || [];
-      const index = starRatings.findIndex(
-        (rating) => rating.id === movieId
-      );
-      if (index !== -1) {
-        starRatings[index].score = newScore;
-      } else {
-        starRatings.push({ id: movieId, score: newScore });
-      }
-      localStorage.setItem("starRatings", JSON.stringify(starRatings));
-      store.setState({ starRatings });
-    }
-  };
-  checkedRate();
-  stars.forEach(($starIcon) => {
-    $starIcon.addEventListener("click", () => {
-      setTimeout(() => {
-        checkedRate();
-        saveRate();
-      }, 0);
-    });
-  });
-};
-const isScrolledToBottom = (threshold = 180) => {
-  return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - threshold;
-};
-const getCurrentPage = (moviesLength, unit) => {
-  return Math.floor(moviesLength / unit) + 1;
-};
-const getCurrentScore = (id, store) => {
-  var _a;
-  const scores = store.getState().starRatings || [];
-  return ((_a = scores.find((rating) => rating.id === id)) == null ? void 0 : _a.score) || 0;
-};
-async function withLoading(store, asyncFunc) {
-  store.setState({ loading: true });
-  try {
-    const result = await asyncFunc();
-    return result;
-  } finally {
-    store.setState({ loading: false });
-  }
-}
-const debounce = (fn, delay) => {
-  let timeoutId;
-  return (...args) => {
-    clearTimeout(timeoutId);
-    timeoutId = window.setTimeout(() => fn(...args), delay);
-  };
-};
-const modalContentTemplate = async (id, store) => {
-  const movie = await fetchMovieDetail(
-    id,
-    (error) => alert(error.message)
-  );
-  const ratingHTML = Rating(getCurrentScore(id, store));
-  const contentHTML = `
-    <div class="modal-image">
-      <div class="skeleton-detail-thumbnail"></div>
-      <img src="${movie.poster_path ? "https://image.tmdb.org/t/p/original" + movie.poster_path : "./images/logo.png"}" alt="${movie.title}" class="detail-thumbnail" />
-    </div>
-    <div class="modal-description" data-testid="modal">
-      <div class="description-information">
-        <h2>${movie.title}</h2>
-        <p class="category">${movie.release_date.slice(
-    0,
-    4
-  )} · ${movie.genres.join(", ")}</p>
-        <p class="rate">
-          <span class="label">평균</span>
-          <img src="./images/star_filled.png" class="star" /><span>${movie.vote_average}</span>
-        </p>
-      </div>
-      <hr />
-      <p class="subtitle">내 별점</p>
-      <div id="modal-rating">${ratingHTML}</div>
-      <hr />
-      <p class="subtitle">줄거리</p>
-      <p class="detail">${movie.overview || "줄거리 정보가 없습니다."}</p>
-    </div>
-  `;
-  setTimeout(() => {
-    attachRatingEvents(id, store);
-  }, 0);
-  return contentHTML;
-};
 const renderTemplate = (container, html) => {
   const template = document.createElement("template");
   template.innerHTML = html.trim();
@@ -421,94 +278,18 @@ const appendHTML = (container, html) => {
   template.innerHTML = html.trim();
   container.appendChild(template.content.firstChild);
 };
-class Modal {
-  constructor(store, contentGenerator) {
-    __publicField(this, "store");
-    __publicField(this, "contentGenerator");
-    __publicField(this, "$modalBackground");
-    __publicField(this, "$closeButton");
-    __publicField(this, "$modalContainer");
-    __publicField(this, "currentMovieId", null);
-    this.store = store;
-    this.contentGenerator = contentGenerator;
-    this.$modalBackground = document.querySelector(
-      "#modal-background"
-    );
-    this.$closeButton = document.querySelector("#close-modal");
-    this.$modalContainer = this.$modalBackground.querySelector(
-      "#modal-container"
-    );
-    this.bindEvents();
-    this.store.subscribe(() => {
-      if (this.isOpen() && this.currentMovieId !== null) {
-        this.updateRating();
-      }
-    });
-  }
-  bindEvents() {
-    this.$closeButton.addEventListener("click", this.close.bind(this));
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this.close();
-    });
-    this.$modalBackground.addEventListener("click", (e) => {
-      if (e.target === this.$modalBackground) this.close();
-    });
-  }
-  open(movieId) {
-    this.currentMovieId = movieId;
-    this.contentGenerator(movieId, this.store).then((contentHTML) => {
-      renderTemplate(this.$modalContainer, contentHTML);
-      this.$modalBackground.classList.add("active");
-      this.attachThumbnailLoadEvent(this.$modalContainer);
-    });
-  }
-  updateRating() {
-    var _a;
-    if (this.currentMovieId) {
-      const $ratingContainer = this.$modalContainer.querySelector(
-        "#modal-rating"
-      );
-      if ($ratingContainer) {
-        const scores = this.store.getState().starRatings || [];
-        const currentScore = ((_a = scores.find((rating) => rating.id === this.currentMovieId)) == null ? void 0 : _a.score) || 0;
-        renderTemplate($ratingContainer, Rating(currentScore));
-        attachRatingEvents(this.currentMovieId, this.store);
-      }
-    }
-  }
-  isOpen() {
-    return this.$modalBackground.classList.contains("active");
-  }
-  close() {
-    this.$modalBackground.classList.remove("active");
-    this.currentMovieId = null;
-  }
-  attachThumbnailLoadEvent($container) {
-    const $thumbnail = $container.querySelector(
-      "img.detail-thumbnail"
-    );
-    if (!$thumbnail) return;
-    if (!$thumbnail.getAttribute("data-load-listener-attached")) {
-      $thumbnail.addEventListener("load", function() {
-        this.style.display = "block";
-        const $prev = this.previousElementSibling;
-        if ($prev && $prev.classList.contains("skeleton-detail-thumbnail")) {
-          $prev.style.display = "none";
-        }
-      });
-      $thumbnail.setAttribute("data-load-listener-attached", "true");
-    }
-  }
-}
+const isScrolledToBottom = () => {
+  return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight;
+};
 const API_BANNER_URL = "https://image.tmdb.org/t/p/original";
 class Banner {
-  constructor($container, store) {
+  constructor($container, store, $modal) {
     __publicField(this, "$container");
     __publicField(this, "store");
     __publicField(this, "$modal");
     this.$container = $container;
     this.store = store;
-    this.$modal = new Modal(this.store, modalContentTemplate);
+    this.$modal = $modal;
     this.store.subscribe(this.render.bind(this));
     this.render(this.store.getState());
   }
@@ -524,9 +305,7 @@ class Banner {
       if ($banner && movie.backdrop_path) {
         $banner.style.backgroundImage = `url(${API_BANNER_URL}${movie.backdrop_path})`;
       }
-      const $detailButton = this.$container.querySelector(
-        "#detail-button"
-      );
+      const $detailButton = this.$container.querySelector("#detail-button");
       if ($detailButton) {
         $detailButton.addEventListener(
           "click",
@@ -611,23 +390,25 @@ const movieItemsTemplate = (movies, query) => {
       `
       );
     }
-    return new Array(MOVIE_COUNT.UNIT).fill(0).map(() => SkeletonMovieItem()).join("");
+    return Array.from({ length: MOVIE_COUNT.UNIT }, SkeletonMovieItem).join("");
   }
   return movies.map(MovieItem).join("");
 };
 class MovieList {
-  constructor($container, store) {
+  constructor($container, store, $modal) {
     __publicField(this, "$container");
     __publicField(this, "store");
+    __publicField(this, "$modal");
     __publicField(this, "prevMoviesLength", 0);
     __publicField(this, "prevQuery", "");
     this.$container = $container;
     this.store = store;
+    this.$modal = $modal;
     this.store.subscribe(this.render.bind(this));
     this.render(this.store.getState());
   }
   render(state) {
-    const $ul = this.$container.querySelector("ul#movie-list");
+    const $ul = this.$container.querySelector("#movie-list");
     if (!this.prevMoviesLength || state.query !== this.prevQuery) {
       renderTemplate(
         this.$container,
@@ -661,15 +442,17 @@ class MovieList {
     });
   }
   attachMovieItemEvents(state) {
-    const $modal = new Modal(this.store, modalContentTemplate);
     this.$container.querySelectorAll("li[data-movie-id]").forEach(($li) => {
-      $li.addEventListener("click", () => {
-        const movieIdString = $li.getAttribute("data-movie-id");
-        const movie = state.movies.find(
-          (movie2) => movie2.id.toString() === movieIdString
-        );
-        if (movie) $modal.open(movie.id);
-      });
+      if (!$li.getAttribute("data-listener-attached")) {
+        $li.addEventListener("click", () => {
+          const movieIdString = $li.getAttribute("data-movie-id");
+          const movie = state.movies.find(
+            (movie2) => movie2.id.toString() === movieIdString
+          );
+          if (movie) this.$modal.open(movie.id);
+        });
+        $li.setAttribute("data-listener-attached", "true");
+      }
     });
   }
 }
@@ -692,6 +475,234 @@ class Store {
     return this.state;
   }
 }
+const debounce = (fn, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = window.setTimeout(() => fn(...args), delay);
+  };
+};
+const isPossibleLoadPopularMovies = (state) => {
+  return !state.query && state.movies.length < MOVIE_COUNT.MAX_PAGE * MOVIE_COUNT.UNIT;
+};
+const isPossibleLoadSearchedMovies = (state) => {
+  return state.query !== "" && state.movies.length < state.searchedMoviesLength;
+};
+const getCurrentPage = (moviesLength, unit) => {
+  return Math.floor(moviesLength / unit) + 1;
+};
+const getCurrentScore = (id, store) => {
+  var _a;
+  const scores = store.getState().starRatings || [];
+  return ((_a = scores.find((rating) => rating.id === id)) == null ? void 0 : _a.score) || 0;
+};
+async function withLoading(store, asyncFunc) {
+  store.setState({ loading: true });
+  try {
+    const result = await asyncFunc();
+    return result;
+  } finally {
+    store.setState({ loading: false });
+  }
+}
+const ALLOWED_RATINGS = [2, 4, 6, 8, 10];
+const Rating = (initialScore = 0) => {
+  const score = ALLOWED_RATINGS.includes(initialScore) ? initialScore : 0;
+  const scoreMessage = SCORE_MESSAGES[score];
+  const labelsHTML = ALLOWED_RATINGS.map(
+    (val) => (
+      /* html */
+      `
+    <label for="star${val}" class="rating__label ${val === 0 ? "" : "rating__label--full"}" data-testid="star${val}">
+      <input type="radio" id="star${val}" class="rating__input" name="rating" value="${val}">
+      <span class="star-icon"></span>
+    </label>`
+    )
+  ).join("");
+  return (
+    /* html */
+    `
+    <div class="rating" data-testid="rating">
+      <div class="rating-bar">
+        ${labelsHTML}
+      </div>
+      <div class="rating-information">
+        <p class="subtitle" data-testid="score-message">${scoreMessage}</p>
+        <p class="subtitle color-95a1b2">(${score}/10)</p>
+      </div>
+    </div>
+  `
+  );
+};
+const attachRatingEvents = (movieId, store) => {
+  var _a;
+  const $rateWrap = document.querySelector(".rating");
+  if (!$rateWrap) return;
+  const scores = store.getState().starRatings || [];
+  const currentScore = ((_a = scores.find((rating) => rating.id === movieId)) == null ? void 0 : _a.score) || 0;
+  const $radio = $rateWrap.querySelector(
+    `#star${currentScore}`
+  );
+  if ($radio) $radio.checked = true;
+  const stars = $rateWrap.querySelectorAll(".star-icon");
+  const initStars = () => {
+    stars.forEach(($star) => $star.classList.remove("filled"));
+  };
+  const checkedRate = () => {
+    const $checkedRadio = $rateWrap.querySelector(
+      '.rating input[type="radio"]:checked'
+    );
+    initStars();
+    if ($checkedRadio) {
+      const starLabels = Array.from($rateWrap.querySelectorAll("label"));
+      const index = starLabels.findIndex(
+        ($label) => $label.contains($checkedRadio)
+      );
+      for (let i = 0; i <= index; i++) {
+        const $icon = starLabels[i].querySelector(".star-icon");
+        if ($icon) $icon.classList.add("filled");
+      }
+    }
+  };
+  const saveRate = () => {
+    const $checkedRadio = $rateWrap.querySelector(
+      '.rating input[type="radio"]:checked'
+    );
+    if ($checkedRadio) {
+      const newScore = Number($checkedRadio.value);
+      let starRatings = store.getState().starRatings || [];
+      const index = starRatings.findIndex((rating) => rating.id === movieId);
+      if (index !== -1) {
+        starRatings[index].score = newScore;
+      } else {
+        starRatings.push({ id: movieId, score: newScore });
+      }
+      localStorage.setItem("starRatings", JSON.stringify(starRatings));
+      store.setState({ starRatings });
+    }
+  };
+  checkedRate();
+  stars.forEach(($starIcon) => {
+    $starIcon.addEventListener("click", () => {
+      setTimeout(() => {
+        checkedRate();
+        saveRate();
+      }, 0);
+    });
+  });
+};
+class Modal {
+  constructor(store, contentGenerator) {
+    __publicField(this, "store");
+    __publicField(this, "contentGenerator");
+    __publicField(this, "$modalBackground");
+    __publicField(this, "$closeButton");
+    __publicField(this, "$modalContainer");
+    __publicField(this, "currentMovieId", null);
+    this.store = store;
+    this.contentGenerator = contentGenerator;
+    this.$modalBackground = document.querySelector("#modal-background");
+    this.$closeButton = document.querySelector("#close-modal");
+    this.$modalContainer = this.$modalBackground.querySelector("#modal-container");
+    this.bindEvents();
+    this.store.subscribe(() => {
+      if (this.isOpen() && this.currentMovieId !== null) {
+        this.updateRating();
+      }
+    });
+  }
+  bindEvents() {
+    this.$closeButton.addEventListener("click", this.close.bind(this));
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.close();
+    });
+    this.$modalBackground.addEventListener("click", (e) => {
+      if (e.target === this.$modalBackground) this.close();
+    });
+  }
+  open(movieId) {
+    this.currentMovieId = movieId;
+    this.contentGenerator(movieId, this.store).then((contentHTML) => {
+      renderTemplate(this.$modalContainer, contentHTML);
+      this.$modalBackground.classList.add("active");
+      this.attachThumbnailLoadEvent(this.$modalContainer);
+    });
+  }
+  updateRating() {
+    var _a;
+    if (this.currentMovieId) {
+      const $ratingContainer = this.$modalContainer.querySelector("#modal-rating");
+      if ($ratingContainer) {
+        const scores = this.store.getState().starRatings || [];
+        const currentScore = ((_a = scores.find((rating) => rating.id === this.currentMovieId)) == null ? void 0 : _a.score) || 0;
+        renderTemplate($ratingContainer, Rating(currentScore));
+        attachRatingEvents(this.currentMovieId, this.store);
+      }
+    }
+  }
+  isOpen() {
+    return this.$modalBackground.classList.contains("active");
+  }
+  close() {
+    this.$modalBackground.classList.remove("active");
+    this.currentMovieId = null;
+  }
+  attachThumbnailLoadEvent($container) {
+    const $thumbnail = $container.querySelector(
+      "img.detail-thumbnail"
+    );
+    if (!$thumbnail) return;
+    if (!$thumbnail.getAttribute("data-load-listener-attached")) {
+      $thumbnail.addEventListener("load", function() {
+        this.style.display = "block";
+        const $prev = this.previousElementSibling;
+        if ($prev && $prev.classList.contains("skeleton-detail-thumbnail")) {
+          $prev.style.display = "none";
+        }
+      });
+      $thumbnail.setAttribute("data-load-listener-attached", "true");
+    }
+  }
+}
+const modalContentTemplate = async (id, store) => {
+  const movie = await fetchMovieDetail(
+    id,
+    (error) => alert(error.message)
+  );
+  const ratingHTML = Rating(getCurrentScore(id, store));
+  const contentHTML = (
+    /* html */
+    `
+    <div class="modal-image">
+      <div class="skeleton-detail-thumbnail"></div>
+      <img src="${movie.poster_path ? "https://image.tmdb.org/t/p/original" + movie.poster_path : "./images/logo.png"}" alt="${movie.title}" class="detail-thumbnail" />
+    </div>
+    <div class="modal-description" data-testid="modal">
+      <div class="description-information">
+        <h2>${movie.title}</h2>
+        <p class="category">${movie.release_date.slice(
+      0,
+      4
+    )} · ${movie.genres.join(", ")}</p>
+        <p class="rate">
+          <span class="label">평균</span>
+          <img src="./images/star_filled.png" class="star" /><span>${movie.vote_average}</span>
+        </p>
+      </div>
+      <hr />
+      <p class="subtitle">내 별점</p>
+      <div id="modal-rating">${ratingHTML}</div>
+      <hr />
+      <p class="subtitle">줄거리</p>
+      <p class="detail">${movie.overview || "줄거리 정보가 없습니다."}</p>
+    </div>
+  `
+  );
+  setTimeout(() => {
+    attachRatingEvents(id, store);
+  }, 0);
+  return contentHTML;
+};
 class App {
   constructor($target) {
     __publicField(this, "$target");
@@ -716,8 +727,17 @@ class App {
     this.$mainContainer.classList.add("container");
     this.$target.appendChild(this.$mainContainer);
     appendHTML(this.$target, Footer());
-    this.$bannerComponent = new Banner(this.$bannerContainer, this.store);
-    this.$movieListComponent = new MovieList(this.$mainContainer, this.store);
+    const $modal = new Modal(this.store, modalContentTemplate);
+    this.$bannerComponent = new Banner(
+      this.$bannerContainer,
+      this.store,
+      $modal
+    );
+    this.$movieListComponent = new MovieList(
+      this.$mainContainer,
+      this.store,
+      $modal
+    );
     if (this.store.getState().movies.length === 0) {
       this.loadPopularMovies();
     }
@@ -735,13 +755,19 @@ class App {
       "scroll",
       debounce(async () => {
         if (isScrolledToBottom()) {
-          console.log("scroll");
           const state = store.getState();
+          if (state.loading) return;
           const currentPage = getCurrentPage(
             state.movies.length,
             MOVIE_COUNT.UNIT
           );
-          if (!state.query && state.movies.length < MOVIE_COUNT.MAX_PAGE * MOVIE_COUNT.UNIT) {
+          const $ul = this.$mainContainer.querySelector("#movie-list");
+          appendHTMLs(
+            $ul,
+            Array.from({ length: MOVIE_COUNT.UNIT }, SkeletonMovieItem).join("")
+          );
+          if (isPossibleLoadPopularMovies(state)) {
+            this.store.setState({ loading: true });
             const newMovies = await withLoading(
               store,
               () => fetchPopularMovies(
@@ -749,8 +775,12 @@ class App {
                 currentPage
               )
             );
-            store.setState({ movies: [...state.movies, ...newMovies] });
-          } else if (state.query && state.movies.length < state.searchedMoviesLength) {
+            store.setState({
+              movies: [...state.movies, ...newMovies],
+              loading: false
+            });
+          } else if (isPossibleLoadSearchedMovies(state)) {
+            this.store.setState({ loading: true });
             const newMoviesData = await withLoading(
               store,
               () => fetchSearchedMovies(
@@ -760,9 +790,11 @@ class App {
               )
             );
             store.setState({
-              movies: [...state.movies, ...newMoviesData.results]
+              movies: [...state.movies, ...newMoviesData.results],
+              loading: false
             });
           }
+          $ul.querySelectorAll(".skeleton-item").forEach(($li) => $li.remove());
         }
       }, 200)
     );
